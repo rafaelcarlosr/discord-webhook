@@ -1,0 +1,45 @@
+# GKE Ingress — provisions a Google Cloud Application Load Balancer automatically.
+# Requires a static IP:
+#   gcloud compute addresses create discord-gateway-ip --global
+#
+# Point your domain's DNS A record to the IP:
+#   gcloud compute addresses describe discord-gateway-ip --global --format='value(address)'
+#
+# Then set that domain as your Discord Interactions Endpoint URL:
+#   https://discord-gateway.YOUR_DOMAIN.com/api/discord/interactions
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: interaction-gateway
+  namespace: discord
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "discord-gateway-ip"
+    networking.gke.io/managed-certificates: "interaction-gateway-cert"
+spec:
+  rules:
+    - host: discord-gateway.YOUR_DOMAIN.com    # <-- replace
+      http:
+        paths:
+          - path: /api/discord/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                # When using KEDA HTTP Add-on, this points to the interceptor proxy
+                # service (keda-http-add-on-interceptor-proxy) instead of the app
+                # service directly. The proxy forwards to the app and handles scale-to-zero.
+                # If NOT using KEDA HTTP Add-on, point to interaction-gateway directly.
+                name: interaction-gateway
+                port:
+                  number: 8080
+---
+# GKE Managed Certificate — auto-provisions a TLS cert via Let's Encrypt.
+# Discord requires HTTPS for the Interactions Endpoint.
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: interaction-gateway-cert
+  namespace: discord
+spec:
+  domains:
+    - discord-gateway.YOUR_DOMAIN.com             # <-- replace

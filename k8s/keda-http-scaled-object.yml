@@ -1,0 +1,30 @@
+# Requires KEDA + KEDA HTTP Add-on installed in the cluster:
+#   helm install keda kedacore/keda -n keda-system --create-namespace
+#   helm install keda-http-addon kedacore/keda-add-ons-http -n keda-system
+#
+# The HTTP Add-on places an interceptor proxy in front of the Service.
+# When replicas = 0, the proxy holds incoming requests and triggers scale-up.
+# Once a pod is ready (milliseconds for native image), traffic flows through.
+apiVersion: http.keda.sh/v1alpha1
+kind: HTTPScaledObject
+metadata:
+  name: interaction-gateway
+  namespace: discord
+spec:
+  hosts:
+    - discord-gateway.example.com   # <-- replace with your actual host / Ingress host
+  pathPrefixes:
+    - /api/discord
+  scaleTargetRef:
+    name: interaction-gateway
+    kind: Deployment
+    apiVersion: apps/v1
+    service: interaction-gateway
+    port: 8080
+  replicas:
+    min: 0       # scale-to-zero when idle
+    max: 10
+  scalingMetric:
+    requestRate:
+      targetValue: 100   # target requests-per-second per replica
+  scaledownPeriod: 300    # seconds of idle before scaling to zero

@@ -1,0 +1,14 @@
+discord:
+  # Hex-encoded Ed25519 public key from the Discord Developer Portal.
+  # Set via environment variable in production.
+  public-key: ${DISCORD_PUBLIC_KEY}
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+server:
+  port: 8080

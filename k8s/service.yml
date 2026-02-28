@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: interaction-gateway
+  namespace: discord
+spec:
+  selector:
+    app: interaction-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP

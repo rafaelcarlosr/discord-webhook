@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: interaction-gateway
+  namespace: discord
+  labels:
+    app: interaction-gateway
+spec:
+  # Replica count is managed by KEDA — do not set manually.
+  selector:
+    matchLabels:
+      app: interaction-gateway
+  template:
+    metadata:
+      labels:
+        app: interaction-gateway
+    spec:
+      containers:
+        - name: gateway
+          # Artifact Registry: REGION-docker.pkg.dev/PROJECT_ID/REPO/IMAGE:TAG
+          image: us-central1-docker.pkg.dev/YOUR_PROJECT/discord/interaction-gateway:0.1.0
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: DISCORD_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: interaction-gateway
+                  key: DISCORD_PUBLIC_KEY
+            - name: REDIS_HOST
+              # Memorystore: use the IP from `gcloud redis instances describe`
+              # Self-hosted: use the K8s service DNS, e.g. redis.discord.svc.cluster.local
+              value: "MEMORYSTORE_IP_OR_K8S_SERVICE"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: interaction-gateway
+                  key: REDIS_PASSWORD
+          # Native image starts in milliseconds — aggressive probes are fine
+          readinessProbe:
+            httpGet:
+              path: /api/discord/interactions
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/discord/interactions
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
