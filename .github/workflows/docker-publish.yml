@@ -11,9 +11,15 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# ---------------------------------------------------------------
+# Job 1 — JVM image
+# Runs on every PR and every push to main/master.
+# Uses the default Dockerfile target (eclipse-temurin:25-jre).
+# Standard ubuntu-latest runner (7 GB RAM) is fine for this.
+# ---------------------------------------------------------------
 jobs:
-  build-and-push:
-    name: Build native image and push to GHCR
+  build-jvm:
+    name: Build JVM image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,10 +28,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # Set up QEMU for multi-platform builds (optional — remove if amd64-only is fine)
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -38,15 +40,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Derive image tags:
-      #  • PRs              → no push, just build + cache
-      #  • push to main     → ghcr.io/owner/repo:latest  + ghcr.io/owner/repo:sha-<short>
-      #  • push tag v1.2.3  → ghcr.io/owner/repo:1.2.3   + ghcr.io/owner/repo:latest
-      - name: Extract metadata (tags & labels)
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-jvm,onlatest=true
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -55,19 +55,69 @@ jobs:
             type=sha,prefix=sha-,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push
+      - name: Build and push JVM image
         uses: docker/build-push-action@v6
         with:
           context: .
-          # Native image build is memory-intensive; limit is set here as a label/comment.
-          # The runner must have enough RAM (≥8 GB). GitHub-hosted ubuntu-latest = 7 GB;
-          # use a self-hosted runner or upgrade to ubuntu-latest-16-cores for production.
+          target: jvm
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Layer cache — reuse across runs
-          cache-from: type=gha
-          cache-to:   type=gha,mode=max
-          # Platforms — native image must match target OS/arch.
-          # Remove linux/arm64 if you don't need ARM deployments.
+          cache-from: type=gha,scope=jvm
+          cache-to:   type=gha,scope=jvm,mode=max
+          platforms: linux/amd64,linux/arm64
+
+# ---------------------------------------------------------------
+# Job 2 — GraalVM native image
+# Runs ONLY on version tags (v*).
+# Needs ~8 GB RAM — uses ubuntu-latest-8-cores (16 GB).
+# Produces a separate image tagged with the -native suffix.
+# ---------------------------------------------------------------
+  build-native:
+    name: Build native image
+    # Only run on release tags; skip for PRs and branch pushes.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest-8-cores   # 16 GB RAM — safe for native-image
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-native,onlatest=true
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest-native
+
+      - name: Build and push native image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: native
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=native
+          cache-to:   type=gha,scope=native,mode=max
+          # Native image is OS+arch-specific; amd64 matches GKE default nodes.
+          # Add linux/arm64 only if you have ARM GKE node pools.
           platforms: linux/amd64
