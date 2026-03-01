@@ -25,7 +25,7 @@ Discord ──POST /api/discord/interactions──► Gateway (Spring Boot)
 | Tool     | Version  |
 |----------|----------|
 | Java     | 25       |
-| Gradle   | 8.14.3 (wrapper included) |
+| Gradle   | 9.3.1 (wrapper included)  |
 | Redis    | 7+       |
 | Docker   | 24+ (for containerised builds) |
 

@@ -10,7 +10,7 @@
 |-------------|------------------------------------------|
 | Language    | Java 25                                  |
 | Framework   | Spring Boot 4.0.0                        |
-| Build       | Gradle 8.14.3 (Kotlin DSL)               |
+| Build       | Gradle 9.3.1 (Kotlin DSL)                |
 | Redis       | Spring Data Redis (Lettuce driver)       |
 | Native      | GraalVM Native Image (optional profile)  |
 | Container   | Docker multi-stage (GraalVM 25 builder)  |
@@ -97,5 +97,5 @@ docker run -e DISCORD_PUBLIC_KEY=<hex-key> \
 ## Development Notes
 
 - Java 25 uses `--enable-preview` features. Gradle is configured to pass preview flags for both `compileJava` and `test` tasks.
-- The Gradle wrapper targets **Gradle 8.14.3**. Do not upgrade without testing native compilation.
+- The Gradle wrapper targets **Gradle 9.3.1**. Do not upgrade without testing native compilation.
 - Tests use `spring-boot-starter-test` (JUnit 5 + Mockito). Run with `./gradlew test`.
