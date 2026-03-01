@@ -8,10 +8,12 @@
 # Usage — run from the Proxmox node shell:
 #
 #   curl -fsSL https://raw.githubusercontent.com/rafaelcarlosr/discord-webhook/main/scripts/setup-gh-runner.sh \
-#     | bash -s -- --token YOUR_TOKEN
+#     | bash -s -- --pat YOUR_GITHUB_PAT
 #
-# Get YOUR_TOKEN from:
-#   GitHub → repo → Settings → Actions → Runners → New self-hosted runner
+# Create a PAT at (mobile-friendly):
+#   GitHub (browser) → Settings → Developer settings
+#     → Fine-grained tokens → New token
+#   Required permission: Actions → Read and Write  (repo scope)
 #
 # Optional overrides (env vars):
 #   LXC_ID=201 LXC_MEMORY=12288 LXC_CORES=6 LXC_DISK=60 LXC_BRIDGE=vmbr0
@@ -19,10 +21,12 @@
 set -euo pipefail
 
 # ── Defaults ───────────────────────────────────────────────────
-REPO_URL="https://github.com/rafaelcarlosr/discord-webhook"
+REPO_OWNER="rafaelcarlosr"
+REPO_NAME="discord-webhook"
+REPO_URL="https://github.com/$REPO_OWNER/$REPO_NAME"
 LXC_ID="${LXC_ID:-200}"
 LXC_HOSTNAME="gh-runner"
-LXC_MEMORY="${LXC_MEMORY:-10240}"   # MB  — needs ≥8 GB for GraalVM
+LXC_MEMORY="${LXC_MEMORY:-10240}"   # MB — needs ≥8 GB for GraalVM
 LXC_CORES="${LXC_CORES:-4}"
 LXC_DISK="${LXC_DISK:-50}"          # GB
 LXC_BRIDGE="${LXC_BRIDGE:-vmbr0}"
@@ -35,23 +39,35 @@ info() { echo -e "${YELLOW}==> $*${NC}"; }
 err()  { echo -e "${RED}ERROR: $*${NC}" >&2; exit 1; }
 
 # ── Args ───────────────────────────────────────────────────────
-TOKEN=""
+PAT=""
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --token) TOKEN="$2"; shift 2 ;;
-    --id)    LXC_ID="$2"; shift 2 ;;
+    --pat) PAT="$2"; shift 2 ;;
+    --id)  LXC_ID="$2"; shift 2 ;;
     *) err "Unknown option: $1" ;;
   esac
 done
 
-[[ -z "$TOKEN" ]] && err "--token is required.\nGet it from: $REPO_URL/settings/actions/runners/new"
+[[ -z "$PAT" ]] && err "--pat is required.\nCreate one at: github.com/settings/personal-access-tokens/new\nRequired permission: Actions → Read and Write"
+
+# ── Fetch runner registration token via API ────────────────────
+info "Fetching runner registration token from GitHub API..."
+API_RESPONSE=$(curl -fsSL \
+  -X POST \
+  -H "Authorization: Bearer $PAT" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/actions/runners/registration-token")
+
+RUNNER_TOKEN=$(echo "$API_RESPONSE" | grep -oP '"token"\s*:\s*"\K[^"]+')
+[[ -z "$RUNNER_TOKEN" ]] && err "Could not get runner token. Check your PAT has 'Actions: Read and Write' permission.\nAPI response: $API_RESPONSE"
+ok "Runner token obtained (expires in 1 hour)"
 
 # ── Pre-flight ─────────────────────────────────────────────────
-command -v pct  &>/dev/null || err "'pct' not found — run this on the Proxmox node shell."
+command -v pct   &>/dev/null || err "'pct' not found — run this on the Proxmox node shell."
 command -v pveam &>/dev/null || err "'pveam' not found — run this on the Proxmox node shell."
-
 pct status "$LXC_ID" &>/dev/null && \
-  err "LXC $LXC_ID already exists. Set a different ID with: LXC_ID=201 bash -s ..."
+  err "LXC $LXC_ID already exists. Use LXC_ID=201 to pick a different ID."
 
 # ── Template ───────────────────────────────────────────────────
 info "Looking for Ubuntu 24.04 template..."
@@ -82,7 +98,7 @@ pct create "$LXC_ID" "$TMPL_FILE" \
 
 info "Starting LXC and waiting for network..."
 pct start "$LXC_ID"
-sleep 10   # give it time to boot + get DHCP lease
+sleep 10
 ok "LXC started"
 
 # ── Docker ─────────────────────────────────────────────────────
@@ -98,20 +114,16 @@ ok "Docker installed"
 info "Installing GitHub Actions runner..."
 pct exec "$LXC_ID" -- bash -c "
   set -euo pipefail
-
-  # Resolve latest runner release
   RUNNER_VER=\$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest \
     | grep -oP '\"tag_name\": \"v\K[^\"]+')
-  RUNNER_URL=\"https://github.com/actions/runner/releases/download/v\${RUNNER_VER}/actions-runner-linux-x64-\${RUNNER_VER}.tar.gz\"
-
   echo \"  Downloading runner v\${RUNNER_VER}...\"
   mkdir -p /opt/actions-runner && cd /opt/actions-runner
-  curl -fsSL \"\$RUNNER_URL\" | tar xz
+  curl -fsSL \"https://github.com/actions/runner/releases/download/v\${RUNNER_VER}/actions-runner-linux-x64-\${RUNNER_VER}.tar.gz\" | tar xz
 
   echo \"  Configuring...\"
   ./config.sh \
     --url      '$REPO_URL' \
-    --token    '$TOKEN' \
+    --token    '$RUNNER_TOKEN' \
     --name     '$LXC_HOSTNAME' \
     --labels   '$RUNNER_LABELS' \
     --work     '/opt/actions-runner/_work' \
@@ -128,7 +140,7 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Self-hosted runner is live!${NC}"
 echo ""
-echo "  Check runner status:   pct exec $LXC_ID -- /opt/actions-runner/svc.sh status"
-echo "  Enter container:       pct enter $LXC_ID"
-echo "  GitHub runners page:   $REPO_URL/settings/actions/runners"
+echo "  Runner status:   pct exec $LXC_ID -- /opt/actions-runner/svc.sh status"
+echo "  Enter container: pct enter $LXC_ID"
+echo "  GitHub page:     $REPO_URL/settings/actions/runners"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
