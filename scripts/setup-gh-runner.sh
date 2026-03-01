@@ -10,10 +10,17 @@
 #   curl -fsSL https://raw.githubusercontent.com/rafaelcarlosr/discord-webhook/main/scripts/setup-gh-runner.sh \
 #     | bash -s -- --pat YOUR_GITHUB_PAT
 #
-# Create a PAT at (mobile-friendly):
-#   GitHub (browser) → Settings → Developer settings
-#     → Fine-grained tokens → New token
-#   Required permission: Actions → Read and Write  (repo scope)
+# Create a PAT at (mobile-friendly) — pick ONE option:
+#
+#   Option A — Classic token (simpler):
+#     GitHub → Settings → Developer settings
+#       → Tokens (classic) → Generate new token
+#     Scope: repo
+#
+#   Option B — Fine-grained token:
+#     GitHub → Settings → Developer settings
+#       → Fine-grained tokens → New token
+#     Repository permission: Administration → Read and Write
 #
 # Optional overrides (env vars):
 #   LXC_ID=201 LXC_MEMORY=12288 LXC_CORES=6 LXC_DISK=60 LXC_BRIDGE=vmbr0
@@ -48,7 +55,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -z "$PAT" ]] && err "--pat is required.\nCreate one at: github.com/settings/personal-access-tokens/new\nRequired permission: Actions → Read and Write"
+[[ -z "$PAT" ]] && err "--pat is required.\nClassic token (scope: repo): github.com/settings/tokens/new\nFine-grained (Administration R/W): github.com/settings/personal-access-tokens/new"
 
 # ── Fetch runner registration token via API ────────────────────
 info "Fetching runner registration token from GitHub API..."
