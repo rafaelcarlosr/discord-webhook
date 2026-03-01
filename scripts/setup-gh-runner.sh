@@ -7,7 +7,7 @@
 #
 # Usage — run from the Proxmox node shell:
 #
-#   curl -fsSL https://raw.githubusercontent.com/rafaelcarlosr/discord-webhook/main/scripts/setup-gh-runner.sh \
+#   curl -fsSL https://raw.githubusercontent.com/rafaelcarlosr/discord-webhook/claude/maven-to-gradle-migration-H0TFL/scripts/setup-gh-runner.sh \
 #     | bash -s -- --pat YOUR_GITHUB_PAT
 #
 # Create a PAT at (mobile-friendly) — pick ONE option:
