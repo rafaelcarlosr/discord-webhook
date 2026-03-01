@@ -1,25 +1,34 @@
 package dev.discord.gateway.controller;
 
 import dev.discord.gateway.service.EventForwardingService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(InteractionController.class)
+@ExtendWith(MockitoExtension.class)
 class InteractionControllerTest {
 
-    @Autowired
+    @Mock
+    private EventForwardingService eventForwardingService;
+
     private MockMvc mockMvc;
 
-    @MockitoBean
-    private EventForwardingService eventForwardingService;
+    @BeforeEach
+    void setUp() {
+        InteractionController controller =
+                new InteractionController(new ObjectMapper(), eventForwardingService);
+        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+    }
 
     @Test
     void pingReturnsPong() throws Exception {
