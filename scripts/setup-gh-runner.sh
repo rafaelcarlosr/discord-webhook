@@ -121,23 +121,34 @@ ok "Docker installed"
 info "Installing GitHub Actions runner..."
 pct exec "$LXC_ID" -- bash -c "
   set -euo pipefail
+
+  # Runner must not run as root — create a dedicated user
+  id runner &>/dev/null || useradd -m -s /bin/bash runner
+  usermod -aG docker runner
+
   RUNNER_VER=\$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest \
     | grep -oP '\"tag_name\": \"v\K[^\"]+')
   echo \"  Downloading runner v\${RUNNER_VER}...\"
-  mkdir -p /opt/actions-runner && cd /opt/actions-runner
-  curl -fsSL \"https://github.com/actions/runner/releases/download/v\${RUNNER_VER}/actions-runner-linux-x64-\${RUNNER_VER}.tar.gz\" | tar xz
+  mkdir -p /opt/actions-runner
+  curl -fsSL \"https://github.com/actions/runner/releases/download/v\${RUNNER_VER}/actions-runner-linux-x64-\${RUNNER_VER}.tar.gz\" \
+    | tar xz -C /opt/actions-runner
+  chown -R runner:runner /opt/actions-runner
 
   echo \"  Configuring...\"
-  ./config.sh \
-    --url      '$REPO_URL' \
-    --token    '$RUNNER_TOKEN' \
-    --name     '$LXC_HOSTNAME' \
-    --labels   '$RUNNER_LABELS' \
-    --work     '/opt/actions-runner/_work' \
-    --unattended
+  su -s /bin/bash runner -c \"
+    cd /opt/actions-runner
+    ./config.sh \
+      --url      '$REPO_URL' \
+      --token    '$RUNNER_TOKEN' \
+      --name     '$LXC_HOSTNAME' \
+      --labels   '$RUNNER_LABELS' \
+      --work     '/opt/actions-runner/_work' \
+      --unattended
+  \"
 
   echo \"  Installing as system service...\"
-  ./svc.sh install root
+  cd /opt/actions-runner
+  ./svc.sh install runner
   ./svc.sh start
 "
 ok "Runner registered and running"
@@ -147,7 +158,7 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Self-hosted runner is live!${NC}"
 echo ""
-echo "  Runner status:   pct exec $LXC_ID -- /opt/actions-runner/svc.sh status"
+echo "  Runner status:   pct exec $LXC_ID -- bash -c 'cd /opt/actions-runner && ./svc.sh status'"
 echo "  Enter container: pct enter $LXC_ID"
 echo "  GitHub page:     $REPO_URL/settings/actions/runners"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
