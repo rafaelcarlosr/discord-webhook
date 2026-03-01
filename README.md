@@ -24,12 +24,12 @@ Discord ──POST /api/discord/interactions──► Gateway (Spring Boot)
 
 | Tool     | Version  |
 |----------|----------|
-| Java     | 21+      |
+| Java     | 25+      |
 | Gradle   | 9.3.1 (wrapper included) |
 | Redis    | 7+       |
 | Docker   | 24+ (for containerised builds) |
 
-> **GraalVM Native Image** compilation requires ~8 GB RAM and GraalVM 21 JDK.
+> **GraalVM Native Image** compilation requires ~8 GB RAM and GraalVM 25 JDK.
 
 ## Quick Start
 
