@@ -4,25 +4,24 @@
 FROM ghcr.io/graalvm/native-image-community:25 AS builder
 WORKDIR /build
 
-# Install Maven
-ARG MAVEN_VERSION=3.9.9
-ADD https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz /tmp/maven.tar.gz
-RUN tar xzf /tmp/maven.tar.gz -C /opt && rm /tmp/maven.tar.gz
-ENV PATH="/opt/apache-maven-${MAVEN_VERSION}/bin:${PATH}"
+# Copy Gradle wrapper and build files first (layer caching)
+COPY gradlew gradlew.bat ./
+COPY gradle ./gradle
+RUN chmod +x gradlew
 
-# Cache dependencies (re-downloaded only when pom.xml changes)
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
+# Cache dependencies (re-downloaded only when build files change)
+COPY build.gradle.kts settings.gradle.kts ./
+RUN ./gradlew dependencies --no-daemon -q
 
 # Build native image
 COPY src ./src
-RUN mvn -Pnative native:compile -DskipTests
+RUN ./gradlew nativeCompile --no-daemon -x test
 
 # === Stage 2: Minimal runtime image ===
 FROM debian:bookworm-slim
 RUN groupadd --gid 1000 app && useradd --uid 1000 --gid app --shell /bin/false app
 WORKDIR /app
-COPY --from=builder /build/target/interaction-gateway .
+COPY --from=builder /build/build/native/nativeCompile/interaction-gateway .
 RUN chmod +x interaction-gateway
 
 USER app
