@@ -2,7 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.0.3"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.graalvm.buildtools.native") version "0.11.4"
+    id("org.graalvm.buildtools.native") version "0.11.3"
 }
 
 group = "dev.discord"
@@ -26,10 +26,6 @@ tasks.withType<Test>().configureEach {
 
 tasks.withType<JavaExec>().configureEach {
     jvmArgs("--enable-preview")
-}
-
-repositories {
-    mavenCentral()
 }
 
 dependencies {
