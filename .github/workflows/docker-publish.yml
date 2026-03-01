@@ -70,14 +70,14 @@ jobs:
 # ---------------------------------------------------------------
 # Job 2 — GraalVM native image
 # Runs ONLY on version tags (v*).
-# Needs ~8 GB RAM — uses ubuntu-latest-8-cores (16 GB).
-# Produces a separate image tagged with the -native suffix.
+# Needs ~8 GB RAM — runs on a self-hosted Proxmox LXC runner
+# labelled 'native-builder'. Setup instructions in README.
 # ---------------------------------------------------------------
   build-native:
     name: Build native image
     # Only run on release tags; skip for PRs and branch pushes.
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest-8-cores   # 16 GB RAM — safe for native-image
+    runs-on: [self-hosted, linux, x64, native-builder]
     permissions:
       contents: read
       packages: write
@@ -116,8 +116,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=native
-          cache-to:   type=gha,scope=native,mode=max
+          cache-from: type=local,src=/tmp/docker-cache-native
+          cache-to:   type=local,dest=/tmp/docker-cache-native,mode=max
           # Native image is OS+arch-specific; amd64 matches GKE default nodes.
           # Add linux/arm64 only if you have ARM GKE node pools.
           platforms: linux/amd64
