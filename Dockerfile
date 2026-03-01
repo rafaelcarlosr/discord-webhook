@@ -35,7 +35,7 @@ ENTRYPOINT ["java", "--enable-preview", "-jar", "app.jar"]
 # Build with:  docker build --target native --memory=8g .
 # Needs ~8 GB RAM to compile; produces a ~50 MB binary.
 # ============================================================
-FROM ghcr.io/graalvm/native-image-community:21 AS native-builder
+FROM ghcr.io/graalvm/native-image-community:25 AS native-builder
 WORKDIR /build
 
 COPY gradlew gradlew.bat ./
