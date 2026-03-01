@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "4.0.0-SNAPSHOT"
+    id("org.springframework.boot") version "4.0.3"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.graalvm.buildtools.native") version "0.10.6"
 }
@@ -29,7 +29,6 @@ tasks.withType<JavaExec>().configureEach {
 }
 
 repositories {
-    maven { url = uri("https://repo.spring.io/snapshot") }
     mavenCentral()
 }
 
