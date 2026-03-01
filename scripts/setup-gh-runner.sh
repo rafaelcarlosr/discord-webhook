@@ -80,18 +80,16 @@ pct status "$LXC_ID" &>/dev/null && \
 
 # ── Template ───────────────────────────────────────────────────
 info "Looking for Ubuntu 24.04 template..."
-TMPL_FILE=$(pveam list local 2>/dev/null | awk '/ubuntu-24\.04.*amd64/{print $1; exit}')
+TMPL_FILE=$(pveam list local 2>/dev/null | awk '/ubuntu-24\.04.*amd64/{sub(/^[^:]+:vztmpl\//, "", $1); print $1; exit}')
 
 if [[ -z "$TMPL_FILE" ]]; then
   info "Not cached locally — downloading from Proxmox repo..."
   pveam update
-  TMPL_NAME=$(pveam available --section system 2>/dev/null | awk '/ubuntu-24\.04.*amd64/{print $2; exit}')
-  [[ -z "$TMPL_NAME" ]] && err "Could not find Ubuntu 24.04 template. Run 'pveam update' manually."
-  pveam download local "$TMPL_NAME"
-  TMPL_FILE="local:vztmpl/$TMPL_NAME"
-else
-  TMPL_FILE="local:vztmpl/$TMPL_FILE"
+  TMPL_FILE=$(pveam available 2>/dev/null | awk '/ubuntu-24\.04.*amd64/{print $2; exit}')
+  [[ -z "$TMPL_FILE" ]] && err "Could not find Ubuntu 24.04 template. Run 'pveam update' manually."
+  pveam download local "$TMPL_FILE"
 fi
+TMPL_FILE="local:vztmpl/$TMPL_FILE"
 ok "Template: $TMPL_FILE"
 
 # ── Create LXC ─────────────────────────────────────────────────
