@@ -84,7 +84,7 @@ TMPL_FILE=$(pveam list local 2>/dev/null | awk '/ubuntu-24\.04.*amd64/{print $1;
 
 if [[ -z "$TMPL_FILE" ]]; then
   info "Not cached locally — downloading from Proxmox repo..."
-  pveam update -q
+  pveam update
   TMPL_NAME=$(pveam available --section system 2>/dev/null | awk '/ubuntu-24\.04.*amd64/{print $2; exit}')
   [[ -z "$TMPL_NAME" ]] && err "Could not find Ubuntu 24.04 template. Run 'pveam update' manually."
   pveam download local "$TMPL_NAME"
