@@ -80,14 +80,18 @@ jobs:
 
 # ---------------------------------------------------------------
 # Job 2 — GraalVM native image
-# Runs ONLY on version tags (v*).
+# Runs on every push to main/master AND on version tags (v*).
 # Needs ~8 GB RAM — runs on a self-hosted Proxmox LXC runner
 # labelled 'native-builder'. Setup instructions in README.
 # ---------------------------------------------------------------
   build-native:
     name: Build native image
-    # Run on release tags, or on manual dispatch with build_native=true.
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.build_native)
+    # Run on master/main push, release tags, or manual dispatch with build_native=true.
+    if: >
+      github.ref == 'refs/heads/master' ||
+      github.ref == 'refs/heads/main'   ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.build_native)
     runs-on: [self-hosted, linux, x64, native-builder]
     permissions:
       contents: read
