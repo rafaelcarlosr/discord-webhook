@@ -20,7 +20,9 @@
 #   Option B — Fine-grained token:
 #     GitHub → Settings → Developer settings
 #       → Fine-grained tokens → New token
-#     Repository permission: Administration → Read and Write
+#     1. Em "Repository access" selecione o repositório (ou All)
+#     2. Só então aparece "Repository permissions"
+#        → Administration → Read and Write
 #
 # Optional overrides (env vars):
 #   LXC_ID=201 LXC_MEMORY=12288 LXC_CORES=6 LXC_DISK=60 LXC_BRIDGE=vmbr0
