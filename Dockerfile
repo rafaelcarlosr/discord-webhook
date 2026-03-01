@@ -2,7 +2,7 @@
 # Stage 1 (shared): build the fat JAR
 # Used by both the JVM and native targets.
 # ============================================================
-FROM eclipse-temurin:25-jdk AS build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /build
 
 COPY gradlew gradlew.bat ./
@@ -22,7 +22,7 @@ RUN ./gradlew bootJar --no-daemon -x test
 #              docker build --target jvm .
 # Needs ~512 MB RAM at runtime.
 # ============================================================
-FROM eclipse-temurin:25-jre AS jvm
+FROM eclipse-temurin:21-jre AS jvm
 RUN groupadd --gid 1000 app && useradd --uid 1000 --gid app --shell /bin/false app
 WORKDIR /app
 COPY --from=build /build/build/libs/*.jar app.jar
@@ -35,7 +35,7 @@ ENTRYPOINT ["java", "--enable-preview", "-jar", "app.jar"]
 # Build with:  docker build --target native --memory=8g .
 # Needs ~8 GB RAM to compile; produces a ~50 MB binary.
 # ============================================================
-FROM ghcr.io/graalvm/native-image-community:25 AS native-builder
+FROM ghcr.io/graalvm/native-image-community:21 AS native-builder
 WORKDIR /build
 
 COPY gradlew gradlew.bat ./

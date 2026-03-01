@@ -24,63 +24,74 @@ Discord ──POST /api/discord/interactions──► Gateway (Spring Boot)
 
 | Tool     | Version  |
 |----------|----------|
-| Java     | 25       |
-| Gradle   | 9.3.1 (wrapper included)  |
+| Java     | 21+      |
+| Gradle   | 9.3.1 (wrapper included) |
 | Redis    | 7+       |
 | Docker   | 24+ (for containerised builds) |
 
-> **GraalVM Native Image** compilation requires ~8 GB RAM and GraalVM 25 JDK.
+> **GraalVM Native Image** compilation requires ~8 GB RAM and GraalVM 21 JDK.
 
 ## Quick Start
 
-### 1. Clone and configure
+### 1. Get your Discord Public Key
+
+Go to the [Discord Developer Portal](https://discord.com/developers/applications) → your app → **General Information** → copy the **Public Key**.
+
+### 2. Start Redis
 
 ```bash
-git clone <repo-url>
-cd discord-webhook
+docker run -d -p 6379:6379 redis:7
 ```
 
-Set your Discord public key and Redis connection via environment variables (see [Configuration](#configuration)).
-
-### 2. Run (JVM mode)
+### 3. Run the gateway
 
 ```bash
-DISCORD_PUBLIC_KEY=<hex-key> ./gradlew bootRun
+DISCORD_PUBLIC_KEY=<your-hex-public-key> ./gradlew bootRun
 ```
 
-### 3. Run tests
+The gateway starts on `http://localhost:8080`.
 
-```bash
-./gradlew test
+### 4. Point Discord at your endpoint
+
+In the Discord Developer Portal → your app → **General Information** → set **Interactions Endpoint URL** to:
+
+```
+https://<your-public-host>/api/discord/interactions
 ```
 
-### 4. Build a fat JAR
+Discord will send a PING to verify — the gateway handles it automatically.
+
+---
+
+## Docker
+
+### JVM image (recommended, ~200 MB)
 
 ```bash
-./gradlew bootJar
-java --enable-preview -jar build/libs/interaction-gateway-0.1.0-SNAPSHOT.jar
-```
-
-### 5. Build & run native binary
-
-```bash
-./gradlew nativeCompile          # requires GraalVM 25
-./build/native/nativeCompile/interaction-gateway
-```
-
-### 6. Docker
-
-```bash
-# Build (native image — needs ~8 GB RAM)
-docker build --memory=8g -t interaction-gateway .
+# Build
+docker build --target jvm -t interaction-gateway .
 
 # Run
 docker run \
   -e DISCORD_PUBLIC_KEY=<hex-key> \
-  -e REDIS_HOST=localhost \
+  -e REDIS_HOST=host.docker.internal \
   -p 8080:8080 \
   interaction-gateway
 ```
+
+### Native image (optional, ~50 MB, faster cold start — needs ~8 GB RAM to build)
+
+```bash
+docker build --target native --memory=8g -t interaction-gateway:native .
+
+docker run \
+  -e DISCORD_PUBLIC_KEY=<hex-key> \
+  -e REDIS_HOST=host.docker.internal \
+  -p 8080:8080 \
+  interaction-gateway:native
+```
+
+---
 
 ## Configuration
 
@@ -93,13 +104,15 @@ All configuration is driven by environment variables:
 | `REDIS_PORT`         | No       | `6379`      | Redis server port                                    |
 | `REDIS_PASSWORD`     | No       | *(empty)*   | Redis AUTH password                                  |
 
+---
+
 ## API
 
 | Method | Path                          | Description                        |
 |--------|-------------------------------|------------------------------------|
 | `POST` | `/api/discord/interactions`   | Receive Discord interaction events |
 
-### Request headers (required by Discord)
+### Required headers (sent by Discord automatically)
 
 | Header                   | Description                              |
 |--------------------------|------------------------------------------|
@@ -108,33 +121,30 @@ All configuration is driven by environment variables:
 
 ### Responses
 
-| Condition           | HTTP | Body          |
-|---------------------|------|---------------|
-| Missing/bad signature | 401 | Error message |
-| PING interaction    | 200  | `{"type":1}`  |
-| Any other event     | 200  | `{"type":5}`  |
+| Condition               | HTTP | Body          |
+|-------------------------|------|---------------|
+| Missing/invalid signature | 401 | Error message |
+| PING interaction        | 200  | `{"type":1}`  |
+| Any other event         | 200  | `{"type":5}`  |
 
-## Project Structure
+---
 
+## Other build commands
+
+```bash
+# Run tests
+./gradlew test
+
+# Build fat JAR
+./gradlew bootJar
+java -jar build/libs/interaction-gateway-0.1.0-SNAPSHOT.jar
+
+# GraalVM native binary (requires GraalVM 21 JDK installed locally)
+./gradlew nativeCompile
+./build/native/nativeCompile/interaction-gateway
 ```
-discord-webhook/
-├── build.gradle.kts                    # Gradle build (Kotlin DSL)
-├── settings.gradle.kts
-├── gradlew / gradlew.bat               # Gradle wrapper
-├── gradle/wrapper/
-├── src/main/java/dev/discord/gateway/
-│   ├── GatewayApplication.java
-│   ├── config/GatewayConfig.java
-│   ├── controller/InteractionController.java
-│   ├── crypto/Ed25519Verifier.java
-│   └── filter/SignatureVerificationFilter.java
-├── src/main/resources/application.yml
-├── src/test/...
-├── Dockerfile                          # Multi-stage native image build
-├── k8s/                                # Kubernetes manifests
-├── CLAUDE.md                           # AI assistant context
-└── README.md
-```
+
+---
 
 ## Kubernetes Deployment
 
@@ -149,11 +159,38 @@ kubectl apply -f k8s/ingress-gke.yml
 kubectl apply -f k8s/keda-http-scaled-object.yml
 ```
 
-## Development Notes
+---
 
-- **Java 25 preview features** are enabled in the Gradle build for both compilation and tests.
-- **Redis Streams** (`discord:events`) provide durability; consumers can use consumer groups for at-least-once processing.
-- The **signature filter** runs before Spring's dispatcher — invalid requests never reach the controller.
+## Project Structure
+
+```
+discord-webhook/
+├── build.gradle.kts                    # Gradle build (Kotlin DSL)
+├── settings.gradle.kts
+├── gradlew / gradlew.bat               # Gradle wrapper
+├── src/main/java/dev/discord/gateway/
+│   ├── GatewayApplication.java
+│   ├── config/GatewayConfig.java
+│   ├── controller/InteractionController.java
+│   ├── crypto/Ed25519Verifier.java
+│   ├── filter/SignatureVerificationFilter.java
+│   ├── filter/CachedBodyHttpServletRequest.java
+│   └── service/EventForwardingService.java
+├── src/main/resources/application.yml
+├── src/test/...
+├── Dockerfile                          # Multi-stage: JVM + native targets
+├── k8s/                                # Kubernetes manifests
+└── README.md
+```
+
+## How it works
+
+1. Discord sends a signed `POST` to `/api/discord/interactions`
+2. `SignatureVerificationFilter` reads the body, verifies the Ed25519 signature using the raw bytes of `timestamp + body` — returns `401` if invalid
+3. `InteractionController` checks the interaction type:
+   - Type `1` (PING) → immediate `{"type":1}` response
+   - Everything else → pushed to the `discord:events` Redis Stream, responds `{"type":5}` (deferred)
+4. Your downstream service reads from the `discord:events` stream and handles the interaction
 
 ## License
 
