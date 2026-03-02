@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws-gateway
+  namespace: discord
+  labels:
+    app: ws-gateway
+spec:
+  # One replica per shard. To run multiple shards, increase replicas and set
+  # DISCORD_SHARD_ID / DISCORD_SHARD_TOTAL accordingly — or migrate to a
+  # StatefulSet where the pod ordinal drives the shard index automatically.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ws-gateway
+  template:
+    metadata:
+      labels:
+        app: ws-gateway
+    spec:
+      containers:
+        - name: ws-gateway
+          image: ws-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: discord-ws-gateway-secret
+                  key: bot-token
+            - name: DISCORD_INTENTS
+              valueFrom:
+                secretKeyRef:
+                  name: discord-ws-gateway-secret
+                  key: intents
+            - name: DISCORD_SHARD_ID
+              value: "0"
+            - name: DISCORD_SHARD_TOTAL
+              value: "1"
+            - name: DISCORD_BROKER_GROUP
+              value: "discord"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

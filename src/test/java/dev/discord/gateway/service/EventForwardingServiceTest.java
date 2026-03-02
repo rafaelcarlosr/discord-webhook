@@ -1,5 +1,6 @@
 package dev.discord.gateway.service;
 
+import dev.discord.gateway.config.BrokerProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -25,12 +26,12 @@ class EventForwardingServiceTest {
         redisTemplate = mock(StringRedisTemplate.class);
         streamOps = mock(StreamOperations.class);
         when(redisTemplate.opsForStream()).thenReturn(streamOps);
-        service = new EventForwardingService(redisTemplate);
+        service = new EventForwardingService(redisTemplate, new BrokerProperties("discord"));
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void forwardPublishesToDiscordEventsStream() {
+    void forwardPublishesToInteractionCreateStream() {
         RecordId expectedId = RecordId.of("1700000000-0");
         when(streamOps.add(any(StringRecord.class))).thenReturn(expectedId);
 
@@ -43,8 +44,20 @@ class EventForwardingServiceTest {
         verify(streamOps).add(captor.capture());
 
         StringRecord record = captor.getValue();
-        assertThat(record.getStream()).isEqualTo("discord:events");
+        assertThat(record.getStream()).isEqualTo("discord:INTERACTION_CREATE");
         assertThat(record.getValue()).containsEntry("payload", payload);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void forwardRespectsConfiguredBrokerGroup() {
+        when(streamOps.add(any(StringRecord.class))).thenReturn(RecordId.of("0-1"));
+        var customService = new EventForwardingService(redisTemplate, new BrokerProperties("mybot"));
+        customService.forward("{\"type\":2}");
+
+        ArgumentCaptor<StringRecord> captor = ArgumentCaptor.forClass(StringRecord.class);
+        verify(streamOps).add(captor.capture());
+        assertThat(captor.getValue().getStream()).isEqualTo("mybot:INTERACTION_CREATE");
     }
 
     @Test

@@ -3,11 +3,13 @@ package dev.discord.gateway.config;
 import dev.discord.gateway.crypto.Ed25519Verifier;
 import dev.discord.gateway.filter.SignatureVerificationFilter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@EnableConfigurationProperties(BrokerProperties.class)
 public class GatewayConfig {
 
     @Bean

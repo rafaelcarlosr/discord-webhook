@@ -1,0 +1,27 @@
+discord:
+  bot-token: ${DISCORD_BOT_TOKEN}
+  intents: ${DISCORD_INTENTS}
+  shard:
+    id: ${DISCORD_SHARD_ID:0}
+    total: ${DISCORD_SHARD_TOTAL:1}
+  broker:
+    group: ${DISCORD_BROKER_GROUP:discord}
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+server:
+  port: 8080

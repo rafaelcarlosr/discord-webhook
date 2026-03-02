@@ -2,6 +2,8 @@ discord:
   # Hex-encoded Ed25519 public key from the Discord Developer Portal.
   # Set via environment variable in production.
   public-key: ${DISCORD_PUBLIC_KEY}
+  broker:
+    group: ${DISCORD_BROKER_GROUP:discord}
 
 spring:
   data:
